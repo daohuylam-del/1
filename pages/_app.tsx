@@ -1,22 +1,29 @@
-import type { AppProps } from 'next/app';
-import '../styles/global.css';
-import { ThemeProvider } from '../contexts/ThemeContext';
-import { CurrencyProvider } from '../contexts/CurrencyContext';
-import ThemeSwitcher from '../components/ThemeSwitcher';
-import CurrencySwitcher from '../components/CurrencySwitcher';
+// app/layout.tsx
+import './globals.css'
+import type { Metadata } from 'next'
+import InstallButton from '@/components/InstallButton'
 
-export default function MyApp({ Component, pageProps }: AppProps) {
+export const metadata: Metadata = {
+  title: 'Ad Finance Manager',
+  description: 'Finance manager for ad accounts',
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
-    <ThemeProvider>
-      <CurrencyProvider>
-        <div style={{ padding: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <CurrencySwitcher />
-            <ThemeSwitcher />
+    <html lang="vi">
+      <body className="min-h-screen bg-background text-foreground">
+        <header className="sticky top-0 border-b bg-white/80 backdrop-blur">
+          <div className="mx-auto max-w-6xl px-4 py-2 flex items-center justify-between">
+            <h1 className="font-semibold">Ad Finance Manager</h1>
+            <InstallButton />
           </div>
-          <Component {...pageProps} />
-        </div>
-      </CurrencyProvider>
-    </ThemeProvider>
-  );
+        </header>
+        <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
+      </body>
+    </html>
+  )
 }
