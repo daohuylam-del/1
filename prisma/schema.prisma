@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  clients   Client[]
+}
+
+model Client {
+  id        Int        @id @default(autoincrement())
+  name      String
+  adAccounts AdAccount[]
+  history   AccountClientHistory[]
+}
+
+model AdAccount {
+  id        Int       @id @default(autoincrement())
+  name      String
+  clientId  Int?
+  client    Client?   @relation(fields: [clientId], references: [id])
+  history   AccountClientHistory[]
+  fundings  AdAccountFunding[]
+  spends    Spend[]
+  invoices  Invoice[]
+}
+
+model AccountClientHistory {
+  id          Int       @id @default(autoincrement())
+  adAccount   AdAccount @relation(fields: [adAccountId], references: [id])
+  adAccountId Int
+  client      Client    @relation(fields: [clientId], references: [id])
+  clientId    Int
+  startDate   DateTime
+  endDate     DateTime?
+}
+
+model Bank {
+  id       Int           @id @default(autoincrement())
+  name     String
+  accounts BankAccount[]
+}
+
+model BankAccount {
+  id        Int      @id @default(autoincrement())
+  bank      Bank     @relation(fields: [bankId], references: [id])
+  bankId    Int
+  name      String
+  cards     Card[]
+  deposits  Deposit[]
+  transactions BankTransaction[]
+}
+
+model Card {
+  id             Int            @id @default(autoincrement())
+  bankAccount    BankAccount    @relation(fields: [bankAccountId], references: [id])
+  bankAccountId  Int
+  number         String
+  fundings       AdAccountFunding[]
+  statements     CardStatement[]
+  deposits       Deposit[]
+  transactions   CardTransaction[]
+}
+
+model AdAccountFunding {
+  id            Int        @id @default(autoincrement())
+  adAccount     AdAccount  @relation(fields: [adAccountId], references: [id])
+  adAccountId   Int
+  card          Card?      @relation(fields: [cardId], references: [id])
+  cardId        Int?
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+  bankAccountId Int?
+  startDate     DateTime
+  endDate       DateTime?
+}
+
+model Spend {
+  id          Int       @id @default(autoincrement())
+  adAccount   AdAccount @relation(fields: [adAccountId], references: [id])
+  adAccountId Int
+  date        DateTime
+  amount      Float
+  currency    String
+  reconciliations Reconciliation[]
+}
+
+model Deposit {
+  id          Int       @id @default(autoincrement())
+  card        Card?     @relation(fields: [cardId], references: [id])
+  cardId      Int?
+  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
+  bankAccountId Int?
+  date        DateTime
+  amount      Float
+  currency    String
+  reconciliations Reconciliation[]
+}
+
+model Invoice {
+  id          Int       @id @default(autoincrement())
+  adAccount   AdAccount @relation(fields: [adAccountId], references: [id])
+  adAccountId Int
+  date        DateTime
+  amount      Float
+  currency    String
+}
+
+model CardStatement {
+  id        Int       @id @default(autoincrement())
+  card      Card      @relation(fields: [cardId], references: [id])
+  cardId    Int
+  periodStart DateTime
+  periodEnd   DateTime
+  transactions CardTransaction[]
+}
+
+model CardTransaction {
+  id             Int       @id @default(autoincrement())
+  cardStatement  CardStatement @relation(fields: [cardStatementId], references: [id])
+  cardStatementId Int
+  date           DateTime
+  description    String
+  amount         Float
+  currency       String
+  reconciliation Reconciliation?
+}
+
+model BankTransaction {
+  id           Int        @id @default(autoincrement())
+  bankAccount  BankAccount @relation(fields: [bankAccountId], references: [id])
+  bankAccountId Int
+  date         DateTime
+  description  String
+  amount       Float
+  currency     String
+  reconciliation Reconciliation?
+}
+
+model Reconciliation {
+  id             Int       @id @default(autoincrement())
+  spend          Spend?    @relation(fields: [spendId], references: [id])
+  spendId        Int?
+  deposit        Deposit?  @relation(fields: [depositId], references: [id])
+  depositId      Int?
+  bankTransaction BankTransaction? @relation(fields: [bankTransactionId], references: [id])
+  bankTransactionId Int?
+  cardTransaction CardTransaction? @relation(fields: [cardTransactionId], references: [id])
+  cardTransactionId Int?
+  status        String
+}
+
+model FXRate {
+  id           Int      @id @default(autoincrement())
+  date         DateTime
+  fromCurrency String
+  toCurrency   String
+  rate         Float
+}
+
+model Setting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+}
+
+model JobLog {
+  id      Int      @id @default(autoincrement())
+  jobName String
+  runAt   DateTime @default(now())
+  status  String
+  message String?
+}
