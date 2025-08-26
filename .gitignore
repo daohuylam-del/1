@@ -1,0 +1,18 @@
+# dependencies
+node_modules
+
+# build outputs
+.next
+dist
+.vercel
+.turbo
+
+# env/secrets
+.env
+.env.*
+
+# prisma (nếu có file sqlite local)
+prisma/dev.db
+
+# OS / misc
+.DS_Store
