@@ -1,0 +1,205 @@
+// Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum AdAccountStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum TransactionType {
+  DEBIT
+  CREDIT
+}
+
+enum ReconcileScope {
+  ACCOUNT
+  CARD
+  BANK
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  email     String    @unique
+  name      String?
+  role      UserRole  @default(USER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Client {
+  id        Int        @id @default(autoincrement())
+  name      String
+  accounts  AdAccount[]
+  invoices  Invoice[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model AdAccount {
+  id         Int               @id @default(autoincrement())
+  platformId String            @unique
+  status     AdAccountStatus   @default(ACTIVE)
+  client     Client?           @relation(fields: [clientId], references: [id])
+  clientId   Int?
+  history    AccountClientHistory[]
+  fundings   AdAccountFunding[]
+  spends     Spend[]
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+}
+
+model AccountClientHistory {
+  id          Int       @id @default(autoincrement())
+  adAccount   AdAccount @relation(fields: [adAccountId], references: [id])
+  adAccountId Int
+  client      Client    @relation(fields: [clientId], references: [id])
+  clientId    Int
+  start       DateTime
+  end         DateTime?
+  @@unique([adAccountId, clientId, start])
+}
+
+model Bank {
+  id        Int            @id @default(autoincrement())
+  name      String
+  accounts  BankAccount[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model BankAccount {
+  id            Int             @id @default(autoincrement())
+  bank          Bank            @relation(fields: [bankId], references: [id])
+  bankId        Int
+  accountNumber String
+  currency      String
+  cards         Card[]
+  transactions  BankTransaction[]
+  deposits      Deposit[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  @@unique([bankId, accountNumber])
+}
+
+model Card {
+  id            Int             @id @default(autoincrement())
+  bankAccount   BankAccount?    @relation(fields: [bankAccountId], references: [id])
+  bankAccountId Int?
+  last4         String
+  fundings      AdAccountFunding[]
+  statements    CardStatement[]
+  transactions  CardTransaction[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+}
+
+model AdAccountFunding {
+  id           Int          @id @default(autoincrement())
+  adAccount    AdAccount    @relation(fields: [adAccountId], references: [id])
+  adAccountId  Int
+  bankAccount  BankAccount? @relation(fields: [bankAccountId], references: [id])
+  bankAccountId Int?
+  card         Card?        @relation(fields: [cardId], references: [id])
+  cardId       Int?
+  start        DateTime
+  end          DateTime?
+  @@unique([adAccountId, start])
+}
+
+model Spend {
+  id         Int       @id @default(autoincrement())
+  adAccount  AdAccount @relation(fields: [adAccountId], references: [id])
+  adAccountId Int
+  amount     Decimal   @db.Decimal(18, 2)
+  date       DateTime
+}
+
+model Deposit {
+  id           Int          @id @default(autoincrement())
+  bankAccount  BankAccount  @relation(fields: [bankAccountId], references: [id])
+  bankAccountId Int
+  amount       Decimal       @db.Decimal(18, 2)
+  date         DateTime
+}
+
+model Invoice {
+  id        Int       @id @default(autoincrement())
+  client    Client    @relation(fields: [clientId], references: [id])
+  clientId  Int
+  amount    Decimal   @db.Decimal(18, 2)
+  issuedAt  DateTime
+}
+
+model CardStatement {
+  id          Int       @id @default(autoincrement())
+  card        Card      @relation(fields: [cardId], references: [id])
+  cardId      Int
+  periodStart DateTime
+  periodEnd   DateTime
+  transactions CardTransaction[]
+}
+
+model CardTransaction {
+  id           Int           @id @default(autoincrement())
+  card         Card          @relation(fields: [cardId], references: [id])
+  cardId       Int
+  statement    CardStatement? @relation(fields: [statementId], references: [id])
+  statementId  Int?
+  type         TransactionType
+  amount       Decimal        @db.Decimal(18, 2)
+  date         DateTime
+}
+
+model BankTransaction {
+  id            Int             @id @default(autoincrement())
+  bankAccount   BankAccount     @relation(fields: [bankAccountId], references: [id])
+  bankAccountId Int
+  type          TransactionType
+  amount        Decimal          @db.Decimal(18, 2)
+  date          DateTime
+}
+
+model Reconciliation {
+  id        Int           @id @default(autoincrement())
+  scope     ReconcileScope
+  reference String?
+  createdAt DateTime       @default(now())
+}
+
+model FXRate {
+  id           Int       @id @default(autoincrement())
+  fromCurrency String
+  toCurrency   String
+  rate         Float
+  date         DateTime
+  @@unique([fromCurrency, toCurrency, date])
+}
+
+model Setting {
+  id     Int    @id @default(autoincrement())
+  key    String @unique
+  value  String
+}
+
+model JobLog {
+  id        Int       @id @default(autoincrement())
+  jobName   String
+  ranAt     DateTime
+  success   Boolean
+  message   String?
+}
+
