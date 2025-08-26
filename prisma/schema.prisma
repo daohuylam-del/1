@@ -1,14 +1,14 @@
-// Prisma schema file
-
+// ---------- Prisma schema (PostgreSQL) ----------
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+/* ===== Enums ===== */
 enum UserRole {
   ADMIN
   USER
@@ -25,15 +25,11 @@ enum TransactionType {
   CREDIT
 }
 
-enum ReconcileScope {
-  ACCOUNT
-  CARD
-  BANK
-}
-
+/* ===== Core models ===== */
 model User {
   id        Int       @id @default(autoincrement())
   email     String    @unique
+  password  String
   name      String?
   role      UserRole  @default(USER)
   createdAt DateTime  @default(now())
@@ -41,165 +37,215 @@ model User {
 }
 
 model Client {
-  id        Int        @id @default(autoincrement())
-  name      String
-  accounts  AdAccount[]
-  invoices  Invoice[]
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id         Int                    @id @default(autoincrement())
+  name       String
+  adAccounts AdAccount[]
+  invoices   Invoice[]
+  history    AccountClientHistory[]
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
 }
 
 model AdAccount {
-  id         Int               @id @default(autoincrement())
-  platformId String            @unique
-  status     AdAccountStatus   @default(ACTIVE)
-  client     Client?           @relation(fields: [clientId], references: [id])
-  clientId   Int?
-  history    AccountClientHistory[]
-  fundings   AdAccountFunding[]
-  spends     Spend[]
-  createdAt  DateTime          @default(now())
-  updatedAt  DateTime          @updatedAt
+  id          Int                  @id @default(autoincrement())
+  platformId  String               @unique         // ví dụ act_123
+  displayName String?
+  status      AdAccountStatus      @default(ACTIVE)
+
+  // client hiện hành (tuỳ chọn); lịch sử mapping nằm ở AccountClientHistory
+  clientId    Int?
+  client      Client?              @relation(fields: [clientId], references: [id])
+
+  history     AccountClientHistory[]
+  fundings    AdAccountFunding[]
+  spends      Spend[]
+  invoices    Invoice[]
+
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([clientId])
 }
 
+/* Mapping Client <-> AdAccount theo giai đoạn (không chồng lấn) */
 model AccountClientHistory {
   id          Int       @id @default(autoincrement())
-  adAccount   AdAccount @relation(fields: [adAccountId], references: [id])
   adAccountId Int
-  client      Client    @relation(fields: [clientId], references: [id])
   clientId    Int
   start       DateTime
   end         DateTime?
+
+  adAccount   AdAccount @relation(fields: [adAccountId], references: [id])
+  client      Client    @relation(fields: [clientId], references: [id])
+
   @@unique([adAccountId, clientId, start])
+  @@index([adAccountId, start])
 }
 
+/* ===== Ngân hàng / thẻ / funding theo giai đoạn ===== */
 model Bank {
-  id        Int            @id @default(autoincrement())
+  id        Int           @id @default(autoincrement())
   name      String
   accounts  BankAccount[]
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 model BankAccount {
-  id            Int             @id @default(autoincrement())
-  bank          Bank            @relation(fields: [bankId], references: [id])
+  id            Int              @id @default(autoincrement())
   bankId        Int
+  bank          Bank             @relation(fields: [bankId], references: [id])
   accountNumber String
   currency      String
   cards         Card[]
   transactions  BankTransaction[]
   deposits      Deposit[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
   @@unique([bankId, accountNumber])
 }
 
 model Card {
-  id            Int             @id @default(autoincrement())
-  bankAccount   BankAccount?    @relation(fields: [bankAccountId], references: [id])
+  id            Int              @id @default(autoincrement())
   bankAccountId Int?
+  bankAccount   BankAccount?     @relation(fields: [bankAccountId], references: [id])
   last4         String
   fundings      AdAccountFunding[]
   statements    CardStatement[]
   transactions  CardTransaction[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 }
 
+/* Funding source (Card/BankAccount) theo giai đoạn */
 model AdAccountFunding {
-  id           Int          @id @default(autoincrement())
-  adAccount    AdAccount    @relation(fields: [adAccountId], references: [id])
-  adAccountId  Int
-  bankAccount  BankAccount? @relation(fields: [bankAccountId], references: [id])
+  id            Int          @id @default(autoincrement())
+  adAccountId   Int
+  adAccount     AdAccount    @relation(fields: [adAccountId], references: [id])
   bankAccountId Int?
-  card         Card?        @relation(fields: [cardId], references: [id])
-  cardId       Int?
-  start        DateTime
-  end          DateTime?
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
+  cardId        Int?
+  card          Card?        @relation(fields: [cardId], references: [id])
+  start         DateTime
+  end           DateTime?
+
   @@unique([adAccountId, start])
+  @@index([adAccountId, start])
 }
 
+/* ===== Dữ liệu phát sinh / báo cáo ===== */
 model Spend {
-  id         Int       @id @default(autoincrement())
-  adAccount  AdAccount @relation(fields: [adAccountId], references: [id])
+  id          Int        @id @default(autoincrement())
   adAccountId Int
-  amount     Decimal   @db.Decimal(18, 2)
-  date       DateTime
+  adAccount   AdAccount  @relation(fields: [adAccountId], references: [id])
+  date        DateTime
+  amount      Decimal    @db.Decimal(18, 2)
+  currency    String
+  reconciliations Reconciliation[]
+
+  @@index([adAccountId, date])
 }
 
 model Deposit {
-  id           Int          @id @default(autoincrement())
-  bankAccount  BankAccount  @relation(fields: [bankAccountId], references: [id])
+  id            Int          @id @default(autoincrement())
   bankAccountId Int
-  amount       Decimal       @db.Decimal(18, 2)
-  date         DateTime
+  bankAccount   BankAccount  @relation(fields: [bankAccountId], references: [id])
+  date          DateTime
+  amount        Decimal      @db.Decimal(18, 2)
+  currency      String
+  reconciliations Reconciliation[]
+
+  @@index([bankAccountId, date])
 }
 
 model Invoice {
   id        Int       @id @default(autoincrement())
-  client    Client    @relation(fields: [clientId], references: [id])
   clientId  Int
-  amount    Decimal   @db.Decimal(18, 2)
+  client    Client    @relation(fields: [clientId], references: [id])
   issuedAt  DateTime
+  amount    Decimal   @db.Decimal(18, 2)
+  currency  String
 }
 
 model CardStatement {
-  id          Int       @id @default(autoincrement())
-  card        Card      @relation(fields: [cardId], references: [id])
-  cardId      Int
-  periodStart DateTime
-  periodEnd   DateTime
+  id           Int              @id @default(autoincrement())
+  cardId       Int
+  card         Card             @relation(fields: [cardId], references: [id])
+  periodStart  DateTime
+  periodEnd    DateTime
   transactions CardTransaction[]
+
+  @@index([cardId, periodStart])
 }
 
 model CardTransaction {
-  id           Int           @id @default(autoincrement())
-  card         Card          @relation(fields: [cardId], references: [id])
-  cardId       Int
-  statement    CardStatement? @relation(fields: [statementId], references: [id])
-  statementId  Int?
-  type         TransactionType
-  amount       Decimal        @db.Decimal(18, 2)
-  date         DateTime
+  id            Int              @id @default(autoincrement())
+  cardId        Int
+  card          Card             @relation(fields: [cardId], references: [id])
+  statementId   Int?
+  statement     CardStatement?   @relation(fields: [statementId], references: [id])
+  type          TransactionType?
+  date          DateTime
+  amount        Decimal          @db.Decimal(18, 2)
+  currency      String
+  description   String?
+  reconciliation Reconciliation?
+
+  @@index([cardId, date])
 }
 
 model BankTransaction {
-  id            Int             @id @default(autoincrement())
-  bankAccount   BankAccount     @relation(fields: [bankAccountId], references: [id])
-  bankAccountId Int
-  type          TransactionType
-  amount        Decimal          @db.Decimal(18, 2)
-  date          DateTime
+  id              Int          @id @default(autoincrement())
+  bankAccountId   Int
+  bankAccount     BankAccount  @relation(fields: [bankAccountId], references: [id])
+  type            TransactionType?
+  date            DateTime
+  amount          Decimal      @db.Decimal(18, 2)
+  currency        String
+  description     String?
+  reconciliation  Reconciliation?
+
+  @@index([bankAccountId, date])
 }
 
+/* Liên kết đối soát (có thể gắn vào một trong bốn loại bản ghi) */
 model Reconciliation {
-  id        Int           @id @default(autoincrement())
-  scope     ReconcileScope
-  reference String?
-  createdAt DateTime       @default(now())
+  id                 Int              @id @default(autoincrement())
+  spendId            Int?
+  spend              Spend?           @relation(fields: [spendId], references: [id])
+  depositId          Int?
+  deposit            Deposit?         @relation(fields: [depositId], references: [id])
+  bankTransactionId  Int?
+  bankTransaction    BankTransaction? @relation(fields: [bankTransactionId], references: [id])
+  cardTransactionId  Int?
+  cardTransaction    CardTransaction? @relation(fields: [cardTransactionId], references: [id])
+  status             String           @default("PENDING")
+  createdAt          DateTime         @default(now())
+
+  @@index([status])
 }
 
+/* ===== Hỗ trợ đa tiền tệ / cấu hình / log ===== */
 model FXRate {
-  id           Int       @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   fromCurrency String
   toCurrency   String
-  rate         Float
   date         DateTime
+  rate         Float
   @@unique([fromCurrency, toCurrency, date])
 }
 
 model Setting {
-  id     Int    @id @default(autoincrement())
-  key    String @unique
-  value  String
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
 }
 
 model JobLog {
-  id        Int       @id @default(autoincrement())
-  jobName   String
-  ranAt     DateTime
-  success   Boolean
-  message   String?
+  id      Int      @id @default(autoincrement())
+  jobName String
+  runAt   DateTime @default(now())
+  status  String
+  message String?
 }
-
