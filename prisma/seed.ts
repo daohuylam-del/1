@@ -1,196 +1,158 @@
-import { PrismaClient } from '@prisma/client';
+// prisma/seed.ts
+import { PrismaClient } from '@prisma/client'
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient()
+
+function addDays(base: Date, days: number) {
+  const d = new Date(base)
+  d.setDate(d.getDate() + days)
+  return d
+}
+
+async function reset() {
+  // Xoá theo thứ tự quan hệ để tránh lỗi FK
+  await prisma.$transaction([
+    prisma.reconciliation.deleteMany(),
+    prisma.cardTransaction.deleteMany(),
+    prisma.bankTransaction.deleteMany(),
+    prisma.cardStatement.deleteMany(),
+    prisma.invoice.deleteMany(),
+    prisma.deposit.deleteMany(),
+    prisma.spend.deleteMany(),
+    prisma.adAccountFunding.deleteMany(),
+    prisma.accountClientHistory.deleteMany(),
+    prisma.adAccount.deleteMany(),
+    prisma.card.deleteMany(),
+    prisma.bankAccount.deleteMany(),
+    prisma.bank.deleteMany(),
+    prisma.client.deleteMany(),
+    prisma.fxRate.deleteMany(),
+    prisma.user.deleteMany(),
+  ])
+}
 
 async function main() {
-  // Create clients
-  const alpha = await prisma.client.create({
-    data: { name: 'Alpha Agency' },
-  });
-  const beta = await prisma.client.create({
-    data: { name: 'Beta Corp' },
-  });
+  await reset()
 
-  // Create cards
-  const card1 = await prisma.card.create({
-    data: { last4: '4242', currency: 'USD' },
-  });
-  const card2 = await prisma.card.create({
-    data: { last4: '5555', currency: 'USD' },
-  });
+  // 1) Clients
+  const cA = await prisma.client.create({ data: { name: 'Client A' } })
+  const cB = await prisma.client.create({ data: { name: 'Client B' } })
 
-  // Create ad accounts
-  const ad1 = await prisma.adAccount.create({
-    data: {
-      name: 'FB-1',
-      platform: 'facebook',
-      currency: 'USD',
-      clientId: alpha.id,
-    },
-  });
-  const ad2 = await prisma.adAccount.create({
-    data: {
-      name: 'FB-2',
-      platform: 'facebook',
-      currency: 'USD',
-      clientId: alpha.id,
-    },
-  });
-  const ad3 = await prisma.adAccount.create({
-    data: {
-      name: 'GG-1',
-      platform: 'google',
-      currency: 'VND',
-      clientId: beta.id,
-    },
-  });
+  // 2) Ad accounts
+  const adA1 = await prisma.adAccount.create({
+    data: { name: 'act_001', clientId: cA.id },
+  })
+  const adB1 = await prisma.adAccount.create({
+    data: { name: 'act_002', clientId: cB.id },
+  })
 
-  // Ad account switching clients mid-month
-  await prisma.adAccountClientHistory.create({
-    data: {
-      adAccountId: ad2.id,
-      clientId: alpha.id,
-      startDate: new Date('2023-05-01'),
-      endDate: new Date('2023-05-15'),
-    },
-  });
-  await prisma.adAccountClientHistory.create({
-    data: {
-      adAccountId: ad2.id,
-      clientId: beta.id,
-      startDate: new Date('2023-05-16'),
-    },
-  });
-
-  // Funding timeline with card change
-  await prisma.fundingTimeline.create({
-    data: {
-      adAccountId: ad1.id,
-      cardId: card1.id,
-      startDate: new Date('2023-05-01'),
-      endDate: new Date('2023-05-10'),
-    },
-  });
-  await prisma.fundingTimeline.create({
-    data: {
-      adAccountId: ad1.id,
-      cardId: card2.id,
-      startDate: new Date('2023-05-11'),
-    },
-  });
-
-  // Sample spends (USD & VND)
-  await prisma.spend.createMany({
+  // 3) Lịch sử mapping account ↔ client
+  const start = addDays(new Date(), -30)
+  await prisma.accountClientHistory.createMany({
     data: [
-      {
-        adAccountId: ad1.id,
-        date: new Date('2023-05-01'),
-        amount: 100,
-        currency: 'USD',
-      },
-      {
-        adAccountId: ad1.id,
-        date: new Date('2023-05-02'),
-        amount: 150,
-        currency: 'USD',
-      },
-      {
-        adAccountId: ad3.id,
-        date: new Date('2023-05-01'),
-        amount: 2000000,
-        currency: 'VND',
-      },
+      { adAccountId: adA1.id, clientId: cA.id, startDate: start },
+      { adAccountId: adB1.id, clientId: cB.id, startDate: start },
     ],
-  });
+  })
 
-  // Deposits
+  // 4) Ngân hàng, tài khoản, thẻ
+  const bank = await prisma.bank.create({ data: { name: 'ACB' } })
+  const bankAcc = await prisma.bankAccount.create({
+    data: { bankId: bank.id, name: 'ACB-123456789' },
+  })
+  const card = await prisma.card.create({
+    data: { bankAccountId: bankAcc.id, number: '4111-1111-1111-1111' },
+  })
+
+  // 5) Funding nguồn thẻ cho adA1
+  await prisma.adAccountFunding.create({
+    data: {
+      adAccountId: adA1.id,
+      cardId: card.id,
+      startDate: start,
+    },
+  })
+
+  // 6) Spend 14 ngày gần đây
+  const today = new Date()
+  for (let i = 14; i >= 0; i--) {
+    const d = addDays(today, -i)
+    await prisma.spend.create({
+      data: {
+        adAccountId: adA1.id,
+        date: d,
+        amount: Math.round(50 + Math.random() * 150), // USD
+        currency: 'USD',
+      },
+    })
+  }
+
+  // 7) Deposit vào bank account (khớp với funding)
   await prisma.deposit.createMany({
     data: [
       {
-        cardId: card1.id,
-        date: new Date('2023-05-05'),
+        bankAccountId: bankAcc.id,
+        date: addDays(today, -12),
         amount: 500,
         currency: 'USD',
       },
       {
-        cardId: card2.id,
-        date: new Date('2023-05-20'),
-        amount: 800,
+        bankAccountId: bankAcc.id,
+        date: addDays(today, -5),
+        amount: 700,
         currency: 'USD',
       },
     ],
-  });
+  })
 
-  // Card statements and card transactions
-  const statement = await prisma.cardStatement.create({
-    data: {
-      cardId: card1.id,
-      startDate: new Date('2023-05-01'),
-      endDate: new Date('2023-05-31'),
-    },
-  });
-
-  await prisma.cardTransaction.createMany({
+  // 8) Invoice FB (gắn với ad account)
+  await prisma.invoice.createMany({
     data: [
       {
-        cardStatementId: statement.id,
-        date: new Date('2023-05-05'),
-        amount: 100,
+        adAccountId: adA1.id,
+        date: addDays(today, -10),
+        amount: 300,
         currency: 'USD',
-        description: 'FB Ads charge',
       },
       {
-        cardStatementId: statement.id,
-        date: new Date('2023-05-06'),
-        amount: 50,
+        adAccountId: adA1.id,
+        date: addDays(today, -3),
+        amount: 420,
         currency: 'USD',
-        description: 'Google Ads charge',
       },
     ],
-  });
+  })
 
-  // Bank transactions
-  await prisma.bankTransaction.createMany({
-    data: [
-      {
-        date: new Date('2023-05-07'),
-        amount: -500,
-        currency: 'USD',
-        description: 'Payment to card',
-      },
-      {
-        date: new Date('2023-05-25'),
-        amount: -800,
-        currency: 'USD',
-        description: 'Payment to card',
-      },
-    ],
-  });
-
-  // FX rates
-  await prisma.fxRate.createMany({
-    data: [
-      {
-        date: new Date('2023-05-01'),
+  // 9) FXRate cho quy đổi (ví dụ USD ↔ VND)
+  const base = addDays(today, -14)
+  for (let i = 0; i <= 14; i++) {
+    const d = addDays(base, i)
+    await prisma.fxRate.create({
+      data: {
+        date: d,
         fromCurrency: 'USD',
         toCurrency: 'VND',
-        rate: 23475,
+        rate: 25000 + Math.round(Math.random() * 500), // ví dụ 25k ±
       },
-      {
-        date: new Date('2023-05-01'),
-        fromCurrency: 'VND',
-        toCurrency: 'USD',
-        rate: 1 / 23475,
-      },
-    ],
-  });
+    })
+  }
+
+  // 10) Optional user (cho demo auth)
+  await prisma.user.create({
+    data: {
+      email: 'admin@example.com',
+      password: 'hashed_password_placeholder',
+    },
+  })
+
+  console.log('✅ Seed data inserted.')
 }
 
 main()
   .catch((e) => {
-    console.error(e);
-    process.exit(1);
+    console.error(e)
+    process.exit(1)
   })
   .finally(async () => {
-    await prisma.$disconnect();
-  });
+    await prisma.$disconnect()
+  })

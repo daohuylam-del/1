@@ -1,21 +1,40 @@
 {
-  "name": "ad-finance-manager",
-  "version": "1.0.0",
-  "description": "Khởi tạo repo để dùng với ChatGPT Codex.",
-  "main": "index.js",
+  "name": "ad-account-manager",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "prisma:migrate": "prisma migrate dev",
     "seed": "ts-node prisma/seed.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
+  "engines": {
+    "node": ">=18.18"
+  },
   "dependencies": {
-    "@prisma/client": "^5.9.1"
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "tailwindcss": "latest",
+    "postcss": "latest",
+    "autoprefixer": "latest",
+    "prisma": "latest",
+    "@prisma/client": "latest",
+    "bcryptjs": "latest",
+    "jsonwebtoken": "latest",
+    "class-variance-authority": "latest",
+    "@radix-ui/react-slot": "latest",
+    "@radix-ui/react-dialog": "latest",
+    "clsx": "latest",
+    "tailwind-merge": "latest"
   },
   "devDependencies": {
-    "ts-node": "^10.9.1",
-    "typescript": "^5.0.0"
+    "typescript": "latest",
+    "eslint": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "ts-node": "latest"
   }
 }
