@@ -8,11 +8,7 @@ export const metadata: Metadata = {
   description: 'Finance manager for ad accounts',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="vi">
       <body className="min-h-screen bg-background text-foreground">
