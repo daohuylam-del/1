@@ -1,79 +1,158 @@
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+// prisma/seed.ts
+import { PrismaClient } from '@prisma/client'
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient()
+
+function addDays(base: Date, days: number) {
+  const d = new Date(base)
+  d.setDate(d.getDate() + days)
+  return d
+}
+
+async function reset() {
+  // Xoá theo thứ tự quan hệ để tránh lỗi FK
+  await prisma.$transaction([
+    prisma.reconciliation.deleteMany(),
+    prisma.cardTransaction.deleteMany(),
+    prisma.bankTransaction.deleteMany(),
+    prisma.cardStatement.deleteMany(),
+    prisma.invoice.deleteMany(),
+    prisma.deposit.deleteMany(),
+    prisma.spend.deleteMany(),
+    prisma.adAccountFunding.deleteMany(),
+    prisma.accountClientHistory.deleteMany(),
+    prisma.adAccount.deleteMany(),
+    prisma.card.deleteMany(),
+    prisma.bankAccount.deleteMany(),
+    prisma.bank.deleteMany(),
+    prisma.client.deleteMany(),
+    prisma.fxRate.deleteMany(),
+    prisma.user.deleteMany(),
+  ])
+}
 
 async function main() {
-  const password = await bcrypt.hash('password', 10);
-  const user = await prisma.user.create({
-    data: { email: 'admin@example.com', password }
-  });
+  await reset()
 
-  const clientA = await prisma.client.create({ data: { name: 'Client A' } });
-  const clientB = await prisma.client.create({ data: { name: 'Client B' } });
+  // 1) Clients
+  const cA = await prisma.client.create({ data: { name: 'Client A' } })
+  const cB = await prisma.client.create({ data: { name: 'Client B' } })
 
-  const ad1 = await prisma.adAccount.create({ data: { name: 'AdAccount 1', clientId: clientA.id } });
-  const ad2 = await prisma.adAccount.create({ data: { name: 'AdAccount 2', clientId: clientA.id } });
-  const ad3 = await prisma.adAccount.create({ data: { name: 'AdAccount 3', clientId: clientB.id } });
+  // 2) Ad accounts
+  const adA1 = await prisma.adAccount.create({
+    data: { name: 'act_001', clientId: cA.id },
+  })
+  const adB1 = await prisma.adAccount.create({
+    data: { name: 'act_002', clientId: cB.id },
+  })
 
-  // History for ad1 switching from clientA to clientB mid month
-  const start = new Date('2024-01-01');
-  const mid = new Date('2024-01-15');
+  // 3) Lịch sử mapping account ↔ client
+  const start = addDays(new Date(), -30)
   await prisma.accountClientHistory.createMany({
     data: [
-      { adAccountId: ad1.id, clientId: clientA.id, startDate: start, endDate: mid },
-      { adAccountId: ad1.id, clientId: clientB.id, startDate: mid, endDate: null },
+      { adAccountId: adA1.id, clientId: cA.id, startDate: start },
+      { adAccountId: adB1.id, clientId: cB.id, startDate: start },
     ],
-  });
+  })
 
-  // Bank, accounts, cards
-  const bank = await prisma.bank.create({ data: { name: 'Bank' } });
-  const bankAccount = await prisma.bankAccount.create({ data: { name: 'Main Account', bankId: bank.id } });
-  const card1 = await prisma.card.create({ data: { number: '1111', bankAccountId: bankAccount.id } });
-  const card2 = await prisma.card.create({ data: { number: '2222', bankAccountId: bankAccount.id } });
+  // 4) Ngân hàng, tài khoản, thẻ
+  const bank = await prisma.bank.create({ data: { name: 'ACB' } })
+  const bankAcc = await prisma.bankAccount.create({
+    data: { bankId: bank.id, name: 'ACB-123456789' },
+  })
+  const card = await prisma.card.create({
+    data: { bankAccountId: bankAcc.id, number: '4111-1111-1111-1111' },
+  })
 
-  // Funding history for ad1 changing card mid cycle
-  const cardSwitch = new Date('2024-01-20');
-  await prisma.adAccountFunding.createMany({
-    data: [
-      { adAccountId: ad1.id, cardId: card1.id, startDate: start, endDate: cardSwitch },
-      { adAccountId: ad1.id, cardId: card2.id, startDate: cardSwitch, endDate: null },
-    ],
-  });
+  // 5) Funding nguồn thẻ cho adA1
+  await prisma.adAccountFunding.create({
+    data: {
+      adAccountId: adA1.id,
+      cardId: card.id,
+      startDate: start,
+    },
+  })
 
-  // Spends
-  await prisma.spend.createMany({
-    data: [
-      { adAccountId: ad1.id, date: new Date('2024-01-10'), amount: 100, currency: 'USD' },
-      { adAccountId: ad1.id, date: new Date('2024-01-18'), amount: 2000000, currency: 'VND' },
-      { adAccountId: ad1.id, date: new Date('2024-01-25'), amount: 150, currency: 'USD' },
-    ],
-  });
+  // 6) Spend 14 ngày gần đây
+  const today = new Date()
+  for (let i = 14; i >= 0; i--) {
+    const d = addDays(today, -i)
+    await prisma.spend.create({
+      data: {
+        adAccountId: adA1.id,
+        date: d,
+        amount: Math.round(50 + Math.random() * 150), // USD
+        currency: 'USD',
+      },
+    })
+  }
 
-  // Deposits
+  // 7) Deposit vào bank account (khớp với funding)
   await prisma.deposit.createMany({
     data: [
-      { cardId: card1.id, date: new Date('2024-01-09'), amount: 100, currency: 'USD' },
-      { cardId: card2.id, date: new Date('2024-01-22'), amount: 200, currency: 'USD' },
+      {
+        bankAccountId: bankAcc.id,
+        date: addDays(today, -12),
+        amount: 500,
+        currency: 'USD',
+      },
+      {
+        bankAccountId: bankAcc.id,
+        date: addDays(today, -5),
+        amount: 700,
+        currency: 'USD',
+      },
     ],
-  });
+  })
 
-  // FX Rates
-  await prisma.fXRate.createMany({
+  // 8) Invoice FB (gắn với ad account)
+  await prisma.invoice.createMany({
     data: [
-      { date: new Date('2024-01-01'), fromCurrency: 'USD', toCurrency: 'VND', rate: 23500 },
-      { date: new Date('2024-01-15'), fromCurrency: 'USD', toCurrency: 'VND', rate: 23600 },
+      {
+        adAccountId: adA1.id,
+        date: addDays(today, -10),
+        amount: 300,
+        currency: 'USD',
+      },
+      {
+        adAccountId: adA1.id,
+        date: addDays(today, -3),
+        amount: 420,
+        currency: 'USD',
+      },
     ],
-  });
+  })
 
-  console.log('Seed complete');
+  // 9) FXRate cho quy đổi (ví dụ USD ↔ VND)
+  const base = addDays(today, -14)
+  for (let i = 0; i <= 14; i++) {
+    const d = addDays(base, i)
+    await prisma.fxRate.create({
+      data: {
+        date: d,
+        fromCurrency: 'USD',
+        toCurrency: 'VND',
+        rate: 25000 + Math.round(Math.random() * 500), // ví dụ 25k ±
+      },
+    })
+  }
+
+  // 10) Optional user (cho demo auth)
+  await prisma.user.create({
+    data: {
+      email: 'admin@example.com',
+      password: 'hashed_password_placeholder',
+    },
+  })
+
+  console.log('✅ Seed data inserted.')
 }
 
 main()
   .catch((e) => {
-    console.error(e);
-    process.exit(1);
+    console.error(e)
+    process.exit(1)
   })
   .finally(async () => {
-    await prisma.$disconnect();
-  });
+    await prisma.$disconnect()
+  })
