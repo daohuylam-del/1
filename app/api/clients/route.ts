@@ -1,19 +1,40 @@
-import { NextResponse } from 'next/server';
-import { clientSchema } from '../../../lib/validators';
-import { clients } from '../../../lib/data';
+import { NextRequest, NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+import { z } from "zod";
+import { requireAuth } from "@/lib/auth";
 
-export async function GET() {
+const prisma = new PrismaClient();
+
+const clientCreateSchema = z.object({
+  name: z.string().min(1, "Tên khách hàng là bắt buộc"),
+});
+
+export async function GET(req: NextRequest) {
+  const guard = requireAuth()(req);
+  if (!guard.authorized) {
+    return NextResponse.json({ error: guard.message }, { status: guard.status });
+  }
+
+  const clients = await prisma.client.findMany({
+    include: { adAccounts: true, invoices: true },
+    orderBy: { id: "desc" },
+  });
   return NextResponse.json(clients);
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const guard = requireAuth(["ADMIN"])(req);
+  if (!guard.authorized) {
+    return NextResponse.json({ error: guard.message }, { status: guard.status });
+  }
+
   try {
     const body = await req.json();
-    const data = clientSchema.parse(body);
-    const client = { id: crypto.randomUUID(), ...data };
-    clients.push(client);
-    return NextResponse.json(client, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
+    const data = clientCreateSchema.parse(body);
+    const created = await prisma.client.create({ data });
+    return NextResponse.json(created, { status: 201 });
+  } catch (e: any) {
+    if (e?.issues) return NextResponse.json({ error: e.issues }, { status: 400 });
+    return NextResponse.json({ error: e?.message || "Error" }, { status: 500 });
   }
 }

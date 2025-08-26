@@ -1,31 +1,67 @@
-import { NextResponse } from 'next/server';
-import { clientSchema } from '../../../../lib/validators';
-import { clients } from '../../../../lib/data';
+import { NextRequest, NextResponse } from "next/server";
+import { PrismaClient } from "@prisma/client";
+import { z } from "zod";
+import { requireAuth } from "@/lib/auth";
 
-interface Params { params: { id: string } }
+const prisma = new PrismaClient();
 
-export async function GET(_req: Request, { params }: Params) {
-  const client = clients.find(c => c.id === params.id);
-  if (!client) return NextResponse.json({ error: 'Client not found' }, { status: 404 });
-  return NextResponse.json(client);
+const clientUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+});
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const guard = requireAuth()(req);
+  if (!guard.authorized) {
+    return NextResponse.json({ error: guard.message }, { status: guard.status });
+  }
+
+  const id = Number(params.id);
+  const item = await prisma.client.findUnique({
+    where: { id },
+    include: { adAccounts: true, invoices: true },
+  });
+  if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(item);
 }
 
-export async function PATCH(req: Request, { params }: Params) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const guard = requireAuth(["ADMIN"])(req);
+  if (!guard.authorized) {
+    return NextResponse.json({ error: guard.message }, { status: guard.status });
+  }
+
   try {
+    const id = Number(params.id);
     const body = await req.json();
-    const data = clientSchema.partial().parse(body);
-    const index = clients.findIndex(c => c.id === params.id);
-    if (index === -1) return NextResponse.json({ error: 'Client not found' }, { status: 404 });
-    clients[index] = { ...clients[index], ...data };
-    return NextResponse.json(clients[index]);
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
+    const data = clientUpdateSchema.parse(body);
+    const updated = await prisma.client.update({ where: { id }, data });
+    return NextResponse.json(updated);
+  } catch (e: any) {
+    if (e?.issues) return NextResponse.json({ error: e.issues }, { status: 400 });
+    return NextResponse.json({ error: e?.message || "Error" }, { status: 500 });
   }
 }
 
-export async function DELETE(_req: Request, { params }: Params) {
-  const index = clients.findIndex(c => c.id === params.id);
-  if (index === -1) return NextResponse.json({ error: 'Client not found' }, { status: 404 });
-  const [deleted] = clients.splice(index, 1);
-  return NextResponse.json(deleted);
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const guard = requireAuth(["ADMIN"])(req);
+  if (!guard.authorized) {
+    return NextResponse.json({ error: guard.message }, { status: guard.status });
+  }
+
+  try {
+    const id = Number(params.id);
+    await prisma.client.delete({ where: { id } });
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Error" }, { status: 500 });
+  }
 }
