@@ -1,18 +1,43 @@
 {
-  "name": "reconcile-app",
-  "version": "1.0.0",
-  "description": "Simple reconciliation API",
-  "main": "src/server.ts",
+  "name": "ad-finance-manager",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "start": "ts-node src/server.ts",
-    "test": "echo 'No tests specified'"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "engines": {
+    "node": ">=18.18"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "body-parser": "^1.20.2"
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "@prisma/client": "latest",
+    "bcryptjs": "latest",
+    "jsonwebtoken": "latest",
+    "class-variance-authority": "latest",
+    "clsx": "latest",
+    "tailwind-merge": "latest",
+    "@radix-ui/react-slot": "latest",
+    "@radix-ui/react-dialog": "latest",
+    "next-pwa": "latest"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
-    "ts-node": "^10.9.1"
+    "prisma": "latest",
+    "typescript": "latest",
+    "eslint": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "ts-node": "latest",
+    "tailwindcss": "latest",
+    "postcss": "latest",
+    "autoprefixer": "latest"
   }
 }
