@@ -1,55 +1,52 @@
-# ad-finance-manager
+# Ad Account Finance Manager
 
-ad-finance-manager is a progressive web application (PWA) for tracking personal finances. It runs on a Node.js backend with a PostgreSQL database.
+**Next.js (App Router) + TypeScript + Prisma (PostgreSQL) + TailwindCSS + shadcn/ui + JWT (HttpOnly) + PWA.**  
+Ứng dụng quản lý tài chính cho tài khoản quảng cáo:  
+- Mapping **AdAccount ↔ Client** theo **giai đoạn** (lịch sử dùng chung tài khoản/đổi chủ giữa tháng).  
+- Theo dõi **nguồn nạp** (Card/Bank), **chi tiêu**, **hóa đơn**, **đối soát** (reconcile) & **đổi tiền** (FX).  
+- **PWA installable**, có thể dùng offline cho báo cáo đọc-chỉ.
 
-## Prerequisites
+---
 
-- **Node.js** ≥ 18
-- **PostgreSQL** ≥ 14
+## 1) Tính năng chính
+- **Quản lý giai đoạn** AdAccount dùng cho Client (không chồng lấn ngày, có lịch sử).
+- **Nguồn nạp đa dạng**: thẻ (Card) hoặc tài khoản ngân hàng (BankAccount); theo dõi statement/transaction.
+- **Chi tiêu / Hóa đơn**: nhập tay hoặc import CSV; tự quy đổi tỷ giá (FXRate) nếu chạy USD.
+- **Đối soát (Reconciliation)**: khớp chi tiêu với dòng tiền nạp/transaction ngân hàng.
+- **Phân quyền** (User/Admin) với JWT HttpOnly cookie.
+- **PWA**: có nút **Install** trên header; cache assets & báo cáo đọc-chỉ.
 
-## Installation
+---
 
-1. **Clone the repository**
-   ```bash
-   git clone <repo-url>
-   cd ad-finance-manager
-   ```
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-3. **Environment variables**
-   Copy `.env.example` to `.env` and adjust the values.
-   ```bash
-   cp .env.example .env
-   ```
-4. **Database setup**
-   Run migrations and seed initial data.
-   ```bash
-   npm run db:migrate
-   npm run db:seed
-   ```
-5. **Start the development server**
-   ```bash
-   npm run dev
-   ```
+## 2) Công nghệ
+- **UI:** Next.js 14 (App Router), React 18, TypeScript, TailwindCSS, shadcn/ui  
+- **Data:** Prisma ORM, **PostgreSQL**  
+- **Auth:** JWT HttpOnly (API routes)  
+- **Khác:** PWA, FX conversion, Zod validation
 
-## Available scripts
+---
 
-- `npm run dev` – start development server with hot reload
-- `npm run build` – compile the production build
-- `npm start` – start the compiled app
-- `npm run db:migrate` – apply database migrations
-- `npm run db:seed` – seed the database with sample data
+## 3) Yêu cầu hệ thống
+- **Node.js ≥ 18.18**
+- **PostgreSQL** đang chạy & truy cập được qua `DATABASE_URL`
 
-## PWA installation
+---
 
-Open the application in a supported browser (e.g., Chrome, Edge, or Safari). Use the “Install app” button in the address bar or select “Add to Home Screen” from the browser menu.
+## 4) Bắt đầu nhanh
+```bash
+git clone <repo-url>
+cd <project-folder>
 
-## Core features
+# 1) Tạo file môi trường
+cp .env.example .env.local   # (hoặc .env) và sửa giá trị
 
-- Track income and expenses
-- Categorize transactions
-- Visualize budgets with charts
-- Works offline once installed as a PWA
+# 2) Cài & chuẩn bị DB
+npm i
+npx prisma generate
+npm run prisma:migrate
 
+# 3) Seed dữ liệu mẫu (users, fxrates, clients, ad-accounts…)
+npm run seed
+
+# 4) Chạy dev
+npm run dev   # http://localhost:3000
