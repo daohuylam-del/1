@@ -7,13 +7,37 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "echo 'No tests specified' && exit 0"
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "engines": {
+    "node": ">=18.18"
   },
   "dependencies": {
-    "next": "13.4.12",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "react-window": "1.8.7",
-    "papaparse": "5.4.1"
+    "next": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "@prisma/client": "latest",
+    "bcryptjs": "latest",
+    "jsonwebtoken": "latest",
+    "class-variance-authority": "latest",
+    "clsx": "latest",
+    "tailwind-merge": "latest",
+    "@radix-ui/react-slot": "latest",
+    "@radix-ui/react-dialog": "latest",
+    "next-pwa": "latest"
+  },
+  "devDependencies": {
+    "prisma": "latest",
+    "typescript": "latest",
+    "eslint": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "ts-node": "latest",
+    "tailwindcss": "latest",
+    "postcss": "latest",
+    "autoprefixer": "latest"
   }
 }
