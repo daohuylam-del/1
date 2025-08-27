@@ -1,11 +1,18 @@
-import type { Config } from 'tailwindcss'
+// tailwind.config.ts
+import type { Config } from "tailwindcss";
 
 const config: Config = {
-  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
-  darkMode: 'class',
+  content: [
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",   // nếu có dùng pages/
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",     // nếu có dùng src/ cho code
+  ],
+  darkMode: "class",
   theme: {
     extend: {},
   },
   plugins: [],
-}
-export default config
+};
+
+export default config;
